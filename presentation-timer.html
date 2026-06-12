@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Presentation Timer</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f5f5f5;
+    --text: #111111;
+    --text-muted: #666666;
+    --border: #dddddd;
+    --accent: #1a1a1a;
+    --timer-color: #111111;
+    --btn-bg: #ffffff;
+    --btn-border: #cccccc;
+    --btn-hover: #f0f0f0;
+    --input-bg: #ffffff;
+    --badge-bg: #f0f0f0;
+  }
+  body.dark {
+    --bg: #0e0e0e;
+    --surface: #1a1a1a;
+    --text: #f0f0f0;
+    --text-muted: #888888;
+    --border: #333333;
+    --accent: #f0f0f0;
+    --timer-color: #f0f0f0;
+    --btn-bg: #1a1a1a;
+    --btn-border: #444444;
+    --btn-hover: #2a2a2a;
+    --input-bg: #1a1a1a;
+    --badge-bg: #2a2a2a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    transition: background 0.3s, color 0.3s;
+    overflow: hidden;
+  }
+
+  #setup-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+    transition: opacity 0.4s;
+  }
+
+  #setup-screen.hidden { opacity: 0; pointer-events: none; }
+
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem 2.5rem;
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .app-title {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+  }
+  .app-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+  }
+
+  .field-group { margin-bottom: 1.5rem; }
+  .field-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+
+  .time-inputs {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .time-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+  }
+  .time-unit span {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .time-unit input {
+    width: 100%;
+    padding: 10px;
+    font-size: 22px;
+    font-weight: 600;
+    text-align: center;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    outline: none;
+    -moz-appearance: textfield;
+  }
+  .time-unit input::-webkit-outer-spin-button,
+  .time-unit input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .time-unit input:focus { border-color: var(--accent); }
+  .time-colon {
+    font-size: 24px;
+    font-weight: 300;
+    color: var(--text-muted);
+    margin-bottom: 18px;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: 14px; color: var(--text); }
+  .toggle-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  .toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 24px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 3px; top: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle input:checked + .toggle-slider { background: #2d6ef6; }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+  .interval-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 0.75rem;
+    transition: opacity 0.2s;
+  }
+  .interval-input-row.disabled { opacity: 0.3; pointer-events: none; }
+  .interval-input-row input {
+    width: 70px;
+    padding: 8px 10px;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    outline: none;
+    -moz-appearance: textfield;
+  }
+  .interval-input-row input::-webkit-outer-spin-button,
+  .interval-input-row input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .interval-input-row span { font-size: 13px; color: var(--text-muted); }
+
+  .options-section { margin-top: 1.25rem; }
+
+  .start-btn {
+    width: 100%;
+    margin-top: 1.75rem;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    background: var(--text);
+    color: var(--bg);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .start-btn:hover { opacity: 0.85; }
+  .start-btn:active { transform: scale(0.98); }
+
+  .theme-toggle-top {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    z-index: 200;
+    transition: background 0.15s;
+  }
+  .theme-toggle-top:hover { background: var(--btn-hover); }
+
+  #timer-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: none;
+    z-index: 100;
+  }
+  #timer-screen.active { display: flex; }
+
+  #timer-display {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--timer-color);
+    font-variant-numeric: tabular-nums;
+    transition: color 0.15s;
+    user-select: none;
+    line-height: 1;
+    white-space: nowrap;
+    display: block;
+    text-align: center;
+  }
+
+  #timer-display.flash {
+    animation: flashAnim 0.5s ease-in-out infinite;
+  }
+  @keyframes flashAnim {
+    0%, 100% { color: var(--timer-color); }
+    50% { color: #2d6ef6; }
+  }
+
+  #timer-display.end-flash {
+    animation: endFlashAnim 0.4s ease-in-out infinite;
+  }
+  @keyframes endFlashAnim {
+    0%, 100% { color: var(--timer-color); }
+    50% { color: #e03030; }
+  }
+
+  #timer-label {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 12px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    user-select: none;
+  }
+  #timer-label.visible { opacity: 1; }
+
+  #controls-overlay {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2rem;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    background: linear-gradient(transparent, rgba(0,0,0,0.04));
+  }
+  body.dark #controls-overlay { background: linear-gradient(transparent, rgba(0,0,0,0.2)); }
+  #controls-overlay.visible { opacity: 1; pointer-events: all; }
+
+  .ctrl-btn {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    background: var(--btn-bg);
+    color: var(--text);
+    border: 1px solid var(--btn-border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .ctrl-btn:hover { background: var(--btn-hover); }
+  .ctrl-btn:active { transform: scale(0.97); }
+  .ctrl-btn.danger { color: #c0392b; border-color: #e0b0b0; }
+  body.dark .ctrl-btn.danger { border-color: #5a2a2a; }
+
+  #status-badge {
+    position: fixed;
+    top: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--badge-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #status-badge.visible { opacity: 1; }
+
+  #wake-lock-notice {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle-top" id="themeBtn" onclick="toggleTheme()">☀ Light</button>
+
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="app-title">Presentation Timer</div>
+    <div class="app-subtitle">Set your duration and go.</div>
+
+    <div class="field-group">
+      <label class="field-label">Duration</label>
+      <div class="time-inputs">
+        <div class="time-unit">
+          <input type="number" id="inp-h" min="0" max="23" value="0" placeholder="0">
+          <span>Hours</span>
+        </div>
+        <div class="time-colon">:</div>
+        <div class="time-unit">
+          <input type="number" id="inp-m" min="0" max="59" value="25" placeholder="0">
+          <span>Mins</span>
+        </div>
+        <div class="time-colon">:</div>
+        <div class="time-unit">
+          <input type="number" id="inp-s" min="0" max="59" value="0" placeholder="0">
+          <span>Secs</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Interval Reminder</label>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Enable interval chimes</div>
+          <div class="toggle-sub">Ring bell at regular intervals</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="tog-interval" checked onchange="toggleIntervalInput()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="interval-input-row" id="interval-row">
+        <input type="number" id="inp-interval" min="1" max="120" value="10">
+        <span>minutes per interval</span>
+      </div>
+    </div>
+
+    <div class="field-group options-section">
+      <label class="field-label">Options</label>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Mute bell</div>
+          <div class="toggle-sub">Flash only — no sound</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="tog-mute">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div id="wake-lock-notice"></div>
+
+    <button class="start-btn" onclick="startTimer()">Start Presentation</button>
+  </div>
+</div>
+
+<div id="timer-screen">
+  <div id="status-badge">PAUSED</div>
+  <div id="timer-display">25:00</div>
+  <div id="timer-label">presentation timer</div>
+  <div id="controls-overlay">
+    <button class="ctrl-btn" id="btn-pause" onclick="togglePause()">Pause</button>
+    <button class="ctrl-btn" id="btn-restart" onclick="restartTimer()">Restart</button>
+    <button class="ctrl-btn danger" onclick="stopTimer()">Stop</button>
+    <button class="ctrl-btn" id="btn-mute" onclick="toggleMute()">🔔 Sound on</button>
+  </div>
+</div>
+
+<script>
+let totalSecs = 0;
+let remaining = 0;
+let intervalMins = 10;
+let useInterval = true;
+let muted = false;
+let isDark = true;
+let paused = false;
+let running = false;
+let ticker = null;
+let idleTimer = null;
+let flashTimer = null;
+let wakeLock = null;
+let audioCtx = null;
+let nextChimeAt = [];
+let endChimeFired = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+  applyTheme();
+  checkWakeLockSupport();
+  document.getElementById('inp-h').addEventListener('input', clampInput);
+  document.getElementById('inp-m').addEventListener('input', clampInput);
+  document.getElementById('inp-s').addEventListener('input', clampInput);
+  document.getElementById('inp-interval').addEventListener('input', clampInput);
+});
+
+function clampInput(e) {
+  const max = parseInt(e.target.max);
+  const min = parseInt(e.target.min);
+  if (e.target.value === '') return;
+  if (parseInt(e.target.value) > max) e.target.value = max;
+  if (parseInt(e.target.value) < min) e.target.value = min;
+}
+
+function checkWakeLockSupport() {
+  const notice = document.getElementById('wake-lock-notice');
+  if ('wakeLock' in navigator) {
+    notice.textContent = '';
+  } else {
+    notice.textContent = '⚠ Wake lock not supported on this browser. Disable auto-lock manually before presenting.';
+  }
+}
+
+function toggleTheme() {
+  isDark = !isDark;
+  applyTheme();
+}
+
+function applyTheme() {
+  document.body.classList.toggle('dark', isDark);
+  document.getElementById('themeBtn').textContent = isDark ? '☀ Light' : '🌙 Dark';
+}
+
+function toggleIntervalInput() {
+  useInterval = document.getElementById('tog-interval').checked;
+  document.getElementById('interval-row').classList.toggle('disabled', !useInterval);
+}
+
+function toggleMute() {
+  muted = !muted;
+  document.getElementById('btn-mute').textContent = muted ? '🔕 Muted' : '🔔 Sound on';
+}
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playBell(times = 1, delay = 0) {
+  if (muted) return;
+  const ctx = getAudioCtx();
+  for (let i = 0; i < times; i++) {
+    const t = ctx.currentTime + delay + i * 1.1;
+    ringOnce(ctx, t);
+  }
+}
+
+function ringOnce(ctx, t) {
+  const master = ctx.createGain();
+  master.connect(ctx.destination);
+  master.gain.setValueAtTime(0.55, t);
+  master.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+
+  const freqs = [2637, 5274, 7911];
+  const amps  = [1.0,  0.45, 0.18];
+
+  freqs.forEach((freq, idx) => {
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(master);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.985, t + 2.2);
+    gain.gain.setValueAtTime(amps[idx], t);
+    osc.start(t);
+    osc.stop(t + 2.5);
+  });
+
+  const click = ctx.createOscillator();
+  const clickGain = ctx.createGain();
+  click.connect(clickGain);
+  clickGain.connect(master);
+  click.type = 'square';
+  click.frequency.setValueAtTime(3500, t);
+  clickGain.gain.setValueAtTime(0.08, t);
+  clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.012);
+  click.start(t);
+  click.stop(t + 0.015);
+}
+
+function flashDisplay(color = 'flash', duration = 5000) {
+  const el = document.getElementById('timer-display');
+  clearTimeout(flashTimer);
+  el.classList.remove('flash', 'end-flash');
+  void el.offsetWidth;
+  el.classList.add(color);
+  flashTimer = setTimeout(() => {
+    el.classList.remove('flash', 'end-flash');
+  }, duration);
+}
+
+function formatTime(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) {
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function buildChimeSchedule() {
+  if (!useInterval || intervalMins <= 0) return [];
+  const intervalSecs = intervalMins * 60;
+  const points = [];
+  for (let t = totalSecs - intervalSecs; t > 0; t -= intervalSecs) {
+    points.push(t);
+  }
+  return points;
+}
+
+function startTimer() {
+  const h = parseInt(document.getElementById('inp-h').value) || 0;
+  const m = parseInt(document.getElementById('inp-m').value) || 0;
+  const s = parseInt(document.getElementById('inp-s').value) || 0;
+  totalSecs = h * 3600 + m * 60 + s;
+  if (totalSecs <= 0) {
+    alert('Please set a duration greater than 0.');
+    return;
+  }
+
+  muted = document.getElementById('tog-mute').checked;
+  useInterval = document.getElementById('tog-interval').checked;
+  intervalMins = parseInt(document.getElementById('inp-interval').value) || 0;
+
+  document.getElementById('btn-mute').textContent = muted ? '🔕 Muted' : '🔔 Sound on';
+
+  remaining = totalSecs;
+  paused = false;
+  running = true;
+  endChimeFired = false;
+  nextChimeAt = buildChimeSchedule();
+
+  document.getElementById('timer-display').textContent = formatTime(remaining);
+  document.getElementById('setup-screen').classList.add('hidden');
+  document.getElementById('timer-screen').classList.add('active');
+  document.getElementById('timer-screen').style.cursor = 'none';
+  fitTimer(true);
+
+  acquireWakeLock();
+  attachActivityListeners();
+  tick();
+  ticker = setInterval(tick, 1000);
+}
+
+function tick() {
+  if (paused) return;
+  if (remaining <= 0) {
+    finishTimer();
+    return;
+  }
+
+  remaining--;
+  document.getElementById('timer-display').textContent = formatTime(remaining);
+  fitTimer(false);
+
+  if (nextChimeAt.length > 0 && remaining === nextChimeAt[0]) {
+    nextChimeAt.shift();
+    playBell(1);
+    flashDisplay('flash', 5000);
+    showLabel('Interval');
+  }
+
+  if (remaining === 0 && !endChimeFired) {
+    endChimeFired = true;
+    finishTimer();
+  }
+}
+
+function finishTimer() {
+  clearInterval(ticker);
+  running = false;
+  playBell(2, 0);
+  flashDisplay('end-flash', 5000);
+  showLabel('Time\'s up!');
+  releaseWakeLock();
+  showControls();
+}
+
+function togglePause() {
+  if (!running && remaining === 0) return;
+  paused = !paused;
+  document.getElementById('btn-pause').textContent = paused ? 'Resume' : 'Pause';
+  document.getElementById('status-badge').classList.toggle('visible', paused);
+  if (!paused && remaining > 0) {
+    clearInterval(ticker);
+    ticker = setInterval(tick, 1000);
+  }
+}
+
+function restartTimer() {
+  clearInterval(ticker);
+  remaining = totalSecs;
+  paused = false;
+  endChimeFired = false;
+  running = true;
+  nextChimeAt = buildChimeSchedule();
+  document.getElementById('timer-display').textContent = formatTime(remaining);
+  fitTimer(false);
+  document.getElementById('timer-display').classList.remove('flash', 'end-flash');
+  document.getElementById('btn-pause').textContent = 'Pause';
+  document.getElementById('status-badge').classList.remove('visible');
+  document.getElementById('timer-label').classList.remove('visible');
+  acquireWakeLock();
+  ticker = setInterval(tick, 1000);
+}
+
+function stopTimer() {
+  clearInterval(ticker);
+  releaseWakeLock();
+  removeActivityListeners();
+  running = false;
+  paused = false;
+  document.getElementById('timer-screen').classList.remove('active');
+  document.getElementById('setup-screen').classList.remove('hidden');
+  document.getElementById('timer-display').classList.remove('flash', 'end-flash');
+  document.getElementById('controls-overlay').classList.remove('visible');
+  document.getElementById('status-badge').classList.remove('visible');
+  document.getElementById('timer-label').classList.remove('visible');
+}
+
+function showLabel(text) {
+  const el = document.getElementById('timer-label');
+  el.textContent = text;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 5000);
+}
+
+let activityBound = false;
+function attachActivityListeners() {
+  if (activityBound) return;
+  activityBound = true;
+  document.getElementById('timer-screen').addEventListener('mousemove', onActivity);
+  document.getElementById('timer-screen').addEventListener('touchstart', onActivity, { passive: true });
+  document.getElementById('timer-screen').addEventListener('click', onActivity);
+}
+function removeActivityListeners() {
+  activityBound = false;
+  document.getElementById('timer-screen').removeEventListener('mousemove', onActivity);
+  document.getElementById('timer-screen').removeEventListener('touchstart', onActivity);
+  document.getElementById('timer-screen').removeEventListener('click', onActivity);
+}
+
+function showControls() {
+  document.getElementById('controls-overlay').classList.add('visible');
+  document.getElementById('timer-screen').style.cursor = 'default';
+  clearTimeout(idleTimer);
+  if (running) {
+    idleTimer = setTimeout(hideControls, 3000);
+  }
+}
+
+function hideControls() {
+  document.getElementById('controls-overlay').classList.remove('visible');
+  document.getElementById('timer-screen').style.cursor = 'none';
+}
+
+function onActivity() {
+  showControls();
+}
+
+async function acquireWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+    } catch (e) {}
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) {
+    wakeLock.release();
+    wakeLock = null;
+  }
+}
+
+function fitTimer(afterVisible) {
+  if (afterVisible) {
+    requestAnimationFrame(() => requestAnimationFrame(() => _doFit()));
+  } else {
+    _doFit();
+  }
+}
+
+function _doFit() {
+  const el = document.getElementById('timer-display');
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const maxW = vw * 0.98;
+  const maxH = vh * 0.72;
+
+  let lo = 10, hi = 2000;
+  while (hi - lo > 1) {
+    const mid = Math.floor((lo + hi) / 2);
+    el.style.fontSize = mid + 'px';
+    const w = el.getBoundingClientRect().width;
+    const h = el.getBoundingClientRect().height;
+    if (w <= maxW && h <= maxH) lo = mid; else hi = mid;
+  }
+  el.style.fontSize = lo + 'px';
+}
+
+window.addEventListener('resize', () => { if (running || remaining > 0) fitTimer(true); });
+
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && running && !paused) {
+    await acquireWakeLock();
+  }
+});
+</script>
+</body>
+</html>
